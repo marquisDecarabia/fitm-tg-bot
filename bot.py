@@ -85,14 +85,33 @@ async def send_department_info(update, context, department):
     text = DEPARTMENT_INFO_TEXT[department]
     url = DEPARTMENT_INFO_LINKS[department]
 
-    keyboard = [
-            [InlineKeyboardButton("📚 Освітня програма", callback_data=f"education_{department}"),
-             InlineKeyboardButton("📩 Контакти", callback_data=f"contacts_{department}")],
-            [InlineKeyboardButton("↩️ Назад", callback_data="departments")],
-        ]
+    keyboard = get_info_keyboard(department)
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     await context.bot.send_message(chat_id=chat_id, text=f"{text}\nДетальна інформація: {url}", reply_markup=reply_markup)
+
+def get_info_keyboard(department):
+    return [
+        [InlineKeyboardButton("📚 Освітня програма", callback_data=f"education_{department}"),
+         InlineKeyboardButton("📩 Контакти", callback_data=f"contacts_{department}")],
+        [InlineKeyboardButton("↩️ Назад", callback_data="departments")],
+    ]
+
+async def send_contacts_or_program(update, context, department, info_type):
+    chat_id = update.effective_chat.id
+    text = ""
+
+    if info_type == "contacts":
+        url = DEPARTMENT_CONTACT_LINKS[department]
+        text = f"📩 Контакти кафедри: {url}"
+    elif info_type == "education":
+        url = DEPARTMENT_EDU_LINKS[department]
+        text = f"🔎 Детальна інформація про освітню програму кафедри: {url}"
+
+    keyboard = get_info_keyboard(department)
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode='HTML')
 
 async def button(update: Update, context:  ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
@@ -101,7 +120,11 @@ async def button(update: Update, context:  ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = query.message.chat_id
     data = query.data
 
-    if data in ["cybersecurity", "computer-science", "math-and-physics"]:
+    if data.startswith('contacts') or data.startswith('education'):
+        info_type = data.split("_")[0]
+        department = data.split("_")[1]
+        await send_contacts_or_program(update, context, department, info_type)
+    elif data in ["cybersecurity", "computer-science", "math-and-physics"]:
         await send_department_info(update, context, data)
     elif data == "more-info":
         await query.edit_message_text(text=FACULTY_INFO, parse_mode='HTML')
@@ -111,16 +134,9 @@ async def button(update: Update, context:  ContextTypes.DEFAULT_TYPE) -> None:
     elif data == "applicants":
         url = APPLICANTS_INFO_LINK
         await context.bot.send_message(update.effective_chat.id, text=f"Детальна інформація для вступникiв доступна за посиланням: {url}")
+        await send_main_menu(chat_id, context)
     elif data == "back":
         await send_main_menu(chat_id, context)
-    elif "education" in data:
-        department = data.split("_")[1]
-        url = DEPARTMENT_EDU_LINKS[department]
-        await context.bot.send_message(chat_id=chat_id, text=f"🔎 Детальна інформація про освітню програму кафедри: {url}")
-    elif "contacts" in data:
-        department = data.split("_")[1]
-        url = DEPARTMENT_CONTACT_LINKS[department]
-        await context.bot.send_message(chat_id=chat_id, text=f"📩Контакти кафедри: {url}")
     else:
         await query.edit_message_text(text=f"⚠️ Щось пiшло не так. \nВибрана опція: {data}")
 
